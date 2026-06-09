@@ -7,7 +7,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from tracker_core.csv_manager import CSVManager
+from tracker_core.excel_manager import ExcelManager
 from tracker_core.evaluator import LicenseEvaluator
 from tracker_core.gcp_client import GCPClient
 
@@ -16,11 +16,11 @@ console = Console()
 
 @app.command()
 def run(
-    file: str = typer.Option("gca_tracker.csv", "--file", "-f", help="Path to gca_tracker.csv"),
+    file: str = typer.Option("gca_tracker.xlsx", "--file", "-f", help="Path to gca_tracker.xlsx"),
     project_id: Optional[str] = typer.Option(None, "--project", "-p", help="GCP Project ID to manage IAM bindings"),
     billing_account_id: Optional[str] = typer.Option(None, "--billing-account", "-b", help="GCP Billing Account ID for Procurement API"),
     order_id: Optional[str] = typer.Option(None, "--order", "-o", help="GCP Order ID for Procurement API"),
-    execute: bool = typer.Option(False, "--execute", "-x", help="Actually execute GCP changes and update CSV (default is dry-run)"),
+    execute: bool = typer.Option(False, "--execute", "-x", help="Actually execute GCP changes and update Excel (default is dry-run)"),
     eval_date_str: Optional[str] = typer.Option(None, "--date", "-d", help="Override evaluation date (YYYY-MM-DD), default is today"),
 ):
     """
@@ -37,22 +37,22 @@ def run(
             console.print(f"[bold red]Error:[/] Invalid date format '{eval_date_str}'. Must be YYYY-MM-DD.", err=True)
             raise typer.Exit(code=1)
 
-    # 2. Check and load CSV
+    # 2. Check and load Excel
     if not os.path.exists(file):
-        # Fallback to template if gca_tracker.csv doesn't exist to make UX easy
-        if file == "gca_tracker.csv" and os.path.exists("gca_tracker_template.csv"):
-            console.print("[yellow]gca_tracker.csv not found. Copying from gca_tracker_template.csv...[/]")
+        # Fallback to template if gca_tracker.xlsx doesn't exist to make UX easy
+        if file == "gca_tracker.xlsx" and os.path.exists("gca_tracker_template.xlsx"):
+            console.print("[yellow]gca_tracker.xlsx not found. Copying from gca_tracker_template.xlsx...[/]")
             import shutil
-            shutil.copy("gca_tracker_template.csv", "gca_tracker.csv")
+            shutil.copy("gca_tracker_template.xlsx", "gca_tracker.xlsx")
         else:
             console.print(f"[bold red]Error:[/] File not found: '{file}'", err=True)
             raise typer.Exit(code=1)
 
-    csv_manager = CSVManager(file)
+    excel_manager = ExcelManager(file)
     try:
-        records = csv_manager.read_records()
+        records = excel_manager.read_records()
     except Exception as e:
-        console.print(f"[bold red]Error loading CSV:[/] {e}", err=True)
+        console.print(f"[bold red]Error loading Excel:[/] {e}", err=True)
         raise typer.Exit(code=1)
 
     # 3. Evaluate records
@@ -123,7 +123,7 @@ def run(
 
     # 5. Execute Mode
     if not execute:
-        console.print("[bold yellow]This was a DRY-RUN. No changes were made to GCP or your CSV file.[/]")
+        console.print("[bold yellow]This was a DRY-RUN. No changes were made to GCP or your Excel file.[/]")
         console.print("To execute these actions, run with the [green]--execute[/] (or [green]-x[/]) flag.")
         return
 
@@ -207,15 +207,15 @@ def run(
             console.print(f"    [green]✓ Successfully revoked GCA access for {email}[/]")
             successful_revocations += 1
 
-    # 6. Save changes back to CSV
+    # 6. Save changes back to Excel
     if successful_provisions > 0 or successful_revocations > 0:
         try:
-            backup_path = csv_manager.write_records(records)
+            backup_path = excel_manager.write_records(records)
             console.print()
-            console.print(f"[bold green]✓ CSV file successfully updated![/]")
+            console.print(f"[bold green]✓ Excel file successfully updated![/]")
             console.print(f"  Backup created at: [yellow]{backup_path}[/]")
         except Exception as e:
-            console.print(f"[bold red]Failed to write updates to CSV:[/] {e}", err=True)
+            console.print(f"[bold red]Failed to write updates to Excel:[/] {e}", err=True)
             raise typer.Exit(code=1)
 
     # Final summary panel

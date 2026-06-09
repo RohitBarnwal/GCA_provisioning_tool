@@ -2,7 +2,7 @@
 
 The **Gemini Code Assist (GCA) License Tracker** is a low-tech, locally executed IT automation tool designed to help customer admins track, provision, and deprovision GCA licenses accurately. 
 
-Using a local CSV file (`gca_tracker.csv`), this tool parses user-requested Start/End dates and coordinates automatically with Google Cloud APIs (Commerce Procurement and IAM) to grant/revoke access. It supports both an **Interactive Desktop GUI** (powered by `CustomTkinter`) and an **Enhanced CLI** (powered by `Typer` and `Rich`), both operating with full default `Dry-Run` security.
+Using a local Excel spreadsheet (`gca_tracker.xlsx`), this tool parses user-requested Start/End dates and coordinates automatically with Google Cloud APIs (Commerce Procurement and IAM) to grant/revoke access. It supports both an **Interactive Desktop GUI** (powered by `CustomTkinter`) and an **Enhanced CLI** (powered by `Typer` and `Rich`), both operating with full default `Dry-Run` security.
 
 ---
 
@@ -10,16 +10,16 @@ Using a local CSV file (`gca_tracker.csv`), this tool parses user-requested Star
 ```text
 .
 ├── tracker_core/
-│   ├── csv_manager.py     # Parses, updates, and creates backups of the CSV
+│   ├── excel_manager.py   # Parses, updates, and creates backups of the Excel spreadsheet
 │   ├── evaluator.py       # Filters records into To Provision/Revoke based on dates
 │   └── gcp_client.py      # Authenticates and interacts with GCP APIs (REST)
 ├── tests/
-│   ├── test_csv_manager.py# Unit tests for CSV logic
+│   ├── test_excel_manager.py # Unit tests for Excel logic
 │   ├── test_evaluator.py  # Unit tests for business logic
 │   └── test_gcp_client.py # Unit tests with mocked GCP calls
 ├── cli.py                 # Elegant Terminal Interface
 ├── gui.py                 # Polished Standalone Desktop Application
-├── gca_tracker_template.csv # Default sample template for tracking
+├── gca_tracker_template.xlsx # Default sample template for tracking
 ├── requirements.txt       # Project python dependencies
 └── README.md              # Project documentation (this file)
 ```
@@ -59,17 +59,17 @@ source venv/bin/activate
 # Activate venv (Windows)
 .\venv\Scripts\activate
 
-# Install requirements
+# Install requirements (includes openpyxl, typer, rich, customtkinter)
 pip install -r requirements.txt
 ```
 
-### 2. Prepare Your CSV File
-Copy `gca_tracker_template.csv` to `gca_tracker.csv` and populate it with your team's GCA assignments:
+### 2. Prepare Your Excel File
+Copy `gca_tracker_template.xlsx` to `gca_tracker.xlsx` and populate it with your team's GCA assignments:
 ```bash
-cp gca_tracker_template.csv gca_tracker.csv
+cp gca_tracker_template.xlsx gca_tracker.xlsx
 ```
 
-#### CSV Schema:
+#### Spreadsheet Columns:
 *   **Email:** User's GCP identity email.
 *   **Team Name:** Admin context (e.g., "Engineering", "Design").
 *   **Start Date:** Date when access starts (`YYYY-MM-DD`).
@@ -87,10 +87,10 @@ python gui.py
 ```
 
 ### GUI Features:
-*   **File Picker:** Click "Browse..." to select your tracker CSV file.
+*   **File Picker:** Click "Browse..." to select your tracker Excel (`.xlsx`) file.
 *   **Settings Form:** Fill in your `GCP Project ID`, `Billing Account ID`, and `Procurement Order ID` (optional parameters, skip what you don't need).
 *   **Dry Run:** Click **Dry Run (Analyze Plan)** to inspect which rows will be acted on today in a safe mode.
-*   **Execute Sync:** Click **Execute GCA Sync** (requires confirmation) to securely apply the changes on Google Cloud. It automatically updates statuses in the CSV and creates a timestamped backup inside a `backups/` directory!
+*   **Execute Sync:** Click **Execute GCA Sync** (requires confirmation) to securely apply the changes on Google Cloud. It automatically updates statuses in the active worksheet and creates a timestamped backup inside a `backups/` directory, **preserving any custom styles, formatting, or other sheets in the workbook!**
 
 ---
 
@@ -99,20 +99,20 @@ python gui.py
 If you prefer to operate directly from your shell, use the CLI.
 
 ### 🔍 Dry-Run Mode (Default)
-Safe preview mode. Parses the CSV and displays pending actions in a color-coded Rich table without modifying anything:
+Safe preview mode. Parses the Excel file and displays pending actions in a color-coded Rich table without modifying anything:
 ```bash
-# Evaluate today's actions on default 'gca_tracker.csv'
+# Evaluate today's actions on default 'gca_tracker.xlsx'
 python cli.py
 
 # Evaluate a specific date (great for future planning!)
 python cli.py --date 2026-06-08
 
-# Specify a custom CSV file
-python cli.py --file path/to/my_tracker.csv
+# Specify a custom Excel file
+python cli.py --file path/to/my_tracker.xlsx
 ```
 
 ### ⚡ Execute Mode
-Executes the API calls and writes the results back to the CSV. **Requires an explicit `--execute` or `-x` flag.**
+Executes the API calls and writes the results back to the Excel spreadsheet. **Requires an explicit `--execute` or `-x` flag.**
 ```bash
 # Sync IAM Role bindings for GCA (adds/removes 'roles/cloudaicompanion.user')
 python cli.py --project my-gca-project-id --execute
@@ -125,7 +125,7 @@ python cli.py -p my-gca-project-id -b 012345-6789AB-CDEF01 -o oph-987654321 -x
 
 ## 🧪 Running Unit Tests
 
-To run the complete test suite (12 tests verifying parsing, logical evaluations, and mock GCP interactions):
+To run the complete test suite (11 tests verifying parsing, logical evaluations, and mock GCP interactions):
 ```bash
 python -m unittest discover -s tests
 ```

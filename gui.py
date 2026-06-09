@@ -5,7 +5,7 @@ import customtkinter as ctkinter
 from datetime import date, datetime
 import re
 
-from tracker_core.csv_manager import CSVManager
+from tracker_core.excel_manager import ExcelManager
 from tracker_core.evaluator import LicenseEvaluator
 from tracker_core.gcp_client import GCPClient
 
@@ -45,18 +45,18 @@ class GCATrackerApp(ctkinter.CTk):
         self.config_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=10)
         self.config_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
-        # Row 1: CSV File Path
-        self.file_label = ctkinter.CTkLabel(self.config_frame, text="Tracker CSV File:")
+        # Row 1: Excel File Path
+        self.file_label = ctkinter.CTkLabel(self.config_frame, text="Tracker Excel File:")
         self.file_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
         
         self.file_entry = ctkinter.CTkEntry(self.config_frame)
         self.file_entry.grid(row=0, column=1, columnspan=2, padx=10, pady=10, sticky="ew")
         
         # Pre-fill default if available
-        if os.path.exists("gca_tracker.csv"):
-            self.file_entry.insert(0, os.path.abspath("gca_tracker.csv"))
-        elif os.path.exists("gca_tracker_template.csv"):
-            self.file_entry.insert(0, os.path.abspath("gca_tracker_template.csv"))
+        if os.path.exists("gca_tracker.xlsx"):
+            self.file_entry.insert(0, os.path.abspath("gca_tracker.xlsx"))
+        elif os.path.exists("gca_tracker_template.xlsx"):
+            self.file_entry.insert(0, os.path.abspath("gca_tracker_template.xlsx"))
 
         self.browse_btn = ctkinter.CTkButton(self.config_frame, text="Browse...", command=self.browse_file)
         self.browse_btn.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
@@ -119,12 +119,12 @@ class GCATrackerApp(ctkinter.CTk):
         self.log("Welcome to GCA License Tracker GUI.\n"
                  "Ensure you have authenticated with GCP using:\n"
                  "  'gcloud auth application-default login'\n\n"
-                 "Select your tracker CSV file, enter your project details, and click 'Dry Run' to preview pending actions.")
+                 "Select your tracker Excel file, enter your project details, and click 'Dry Run' to preview pending actions.")
 
     def browse_file(self):
         filename = filedialog.askopenfilename(
-            title="Select Tracker CSV File",
-            filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
+            title="Select Tracker Excel File",
+            filetypes=[("Excel Files", "*.xlsx"), ("All Files", "*.*")]
         )
         if filename:
             self.file_entry.delete(0, tk.END)
@@ -152,11 +152,11 @@ class GCATrackerApp(ctkinter.CTk):
             return None
 
         if not file_path:
-            messagebox.showerror("Error", "Please select a Tracker CSV file.")
+            messagebox.showerror("Error", "Please select a Tracker Excel file.")
             return None
 
         if not os.path.exists(file_path):
-            messagebox.showerror("Error", f"CSV file not found: {file_path}")
+            messagebox.showerror("Error", f"Excel file not found: {file_path}")
             return None
 
         return {
@@ -176,11 +176,11 @@ class GCATrackerApp(ctkinter.CTk):
         self.log(f"--- STARTING DRY RUN EVALUATION ({config['eval_date']}) ---")
         self.log(f"File: {config['file_path']}")
         
-        csv_manager = CSVManager(config["file_path"])
+        excel_manager = ExcelManager(config["file_path"])
         try:
-            records = csv_manager.read_records()
+            records = excel_manager.read_records()
         except Exception as e:
-            self.log(f"[ERROR] Failed to parse CSV: {e}")
+            self.log(f"[ERROR] Failed to parse Excel: {e}")
             return
 
         evaluator = LicenseEvaluator()
@@ -228,11 +228,11 @@ class GCATrackerApp(ctkinter.CTk):
         self.log("\n" + "#"*80)
         self.log(f"--- STARTING GCP EXECUTION SYNC ({config['eval_date']}) ---")
         
-        csv_manager = CSVManager(config["file_path"])
+        excel_manager = ExcelManager(config["file_path"])
         try:
-            records = csv_manager.read_records()
+            records = excel_manager.read_records()
         except Exception as e:
-            self.log(f"[ERROR] Failed to parse CSV: {e}")
+            self.log(f"[ERROR] Failed to parse Excel: {e}")
             return
 
         evaluator = LicenseEvaluator()
@@ -311,15 +311,15 @@ class GCATrackerApp(ctkinter.CTk):
                 self.log(f"     ✓ Successfully revoked access for {email}")
                 successful_revocations += 1
 
-        # Write updates back to CSV
+        # Write updates back to Excel
         if successful_provisions > 0 or successful_revocations > 0:
             try:
-                backup_path = csv_manager.write_records(records)
-                self.log(f"\n💾 [CSV UPDATED]: File successfully saved!")
+                backup_path = excel_manager.write_records(records)
+                self.log(f"\n💾 [EXCEL UPDATED]: File successfully saved!")
                 self.log(f"   Backup created: {backup_path}")
             except Exception as e:
-                self.log(f"\n❌ [CRITICAL]: Failed to update CSV file: {e}")
-                messagebox.showerror("CSV Save Error", f"Failed to save CSV changes: {e}")
+                self.log(f"\n❌ [CRITICAL]: Failed to update Excel file: {e}")
+                messagebox.showerror("Excel Save Error", f"Failed to save Excel changes: {e}")
 
         self.log("\n🏆 --- SYNC SUMMARY ---")
         self.log(f"   Provisions Successful: {successful_provisions}")

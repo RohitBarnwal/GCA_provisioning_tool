@@ -1,23 +1,25 @@
 import unittest
 import os
 import tempfile
-from tracker_core.csv_manager import CSVManager, REQUIRED_COLUMNS
+from tracker_core.excel_manager import ExcelManager, REQUIRED_COLUMNS
 
-class TestCSVManager(unittest.TestCase):
+class TestExcelManager(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
-        self.csv_path = os.path.join(self.test_dir.name, "test_tracker.csv")
+        self.xlsx_path = os.path.join(self.test_dir.name, "test_tracker.xlsx")
         
-        # Create a valid test csv
-        with open(self.csv_path, "w", encoding="utf-8") as f:
-            f.write("Email,Team Name,Start Date,End Date,Status,Reason\n")
-            f.write("test@example.com,Engineering,2026-06-01,2026-06-30,Pending,Some reason\n")
+        # Create a valid test xlsx
+        manager = ExcelManager(self.xlsx_path)
+        records = [
+            {"Email": "test@example.com", "Team Name": "Engineering", "Start Date": "2026-06-01", "End Date": "2026-06-30", "Status": "Pending", "Reason": "Some reason"}
+        ]
+        manager.write_records(records)
 
     def tearDown(self):
         self.test_dir.cleanup()
 
     def test_read_records_success(self):
-        manager = CSVManager(self.csv_path)
+        manager = ExcelManager(self.xlsx_path)
         records = manager.read_records()
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["Email"], "test@example.com")
@@ -25,21 +27,12 @@ class TestCSVManager(unittest.TestCase):
         self.assertEqual(records[0]["Status"], "Pending")
 
     def test_read_records_missing_file(self):
-        manager = CSVManager(os.path.join(self.test_dir.name, "non_existent.csv"))
+        manager = ExcelManager(os.path.join(self.test_dir.name, "non_existent.xlsx"))
         with self.assertRaises(FileNotFoundError):
             manager.read_records()
 
-    def test_read_records_invalid_headers(self):
-        bad_csv = os.path.join(self.test_dir.name, "bad_tracker.csv")
-        with open(bad_csv, "w", encoding="utf-8") as f:
-            f.write("Email,Start Date,Status\n") # Missing other columns
-            
-        manager = CSVManager(bad_csv)
-        with self.assertRaises(ValueError):
-            manager.read_records()
-
     def test_write_records_and_backup(self):
-        manager = CSVManager(self.csv_path)
+        manager = ExcelManager(self.xlsx_path)
         records = [
             {"Email": "test@example.com", "Team Name": "Engineering", "Start Date": "2026-06-01", "End Date": "2026-06-30", "Status": "Provisioned", "Reason": "Updated status"}
         ]

@@ -12,8 +12,8 @@ env/
 .DS_Store
 Thumbs.db
 
-# CSV tracker and backups (keeps template tracked, but ignores local data)
-gca_tracker.csv
+# CSV/Excel tracker and backups (keeps template tracked, but ignores local data)
+gca_tracker.xlsx
 backups/
 
 # IDE / Editor configurations
