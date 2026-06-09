@@ -266,10 +266,17 @@ class GCATrackerApp(ctkinter.CTk):
                 row_idx = item["row_index"]
                 self.log(f"   • Processing {email}...")
 
-                # IAM Binding
-                iam_ok, iam_msg = gcp_client.add_iam_role(email)
+                # IAM Bindings
+                iam_ok, iam_msg = gcp_client.add_iam_role(email, "roles/cloudaicompanion.user")
                 if not iam_ok:
-                    self.log(f"     ✗ [IAM Error]: {iam_msg}")
+                    self.log(f"     ✗ [GCA User IAM Error]: {iam_msg}")
+                    failed_actions += 1
+                    continue
+
+                iam_ok2, iam_msg2 = gcp_client.add_iam_role(email, "roles/serviceusage.serviceUsageConsumer")
+                if not iam_ok2:
+                    self.log(f"     ✗ [Service Usage IAM Error]: {iam_msg2}")
+                    gcp_client.remove_iam_role(email, "roles/cloudaicompanion.user")
                     failed_actions += 1
                     continue
 
@@ -277,7 +284,8 @@ class GCATrackerApp(ctkinter.CTk):
                 lic_ok, lic_msg = gcp_client.assign_license(email)
                 if not lic_ok:
                     self.log(f"     ✗ [Licensing Error]: {lic_msg}")
-                    gcp_client.remove_iam_role(email)  # Rollback IAM
+                    gcp_client.remove_iam_role(email, "roles/serviceusage.serviceUsageConsumer")
+                    gcp_client.remove_iam_role(email, "roles/cloudaicompanion.user")
                     failed_actions += 1
                     continue
 
@@ -293,10 +301,16 @@ class GCATrackerApp(ctkinter.CTk):
                 row_idx = item["row_index"]
                 self.log(f"   • Processing {email}...")
 
-                # Remove IAM Binding
-                iam_ok, iam_msg = gcp_client.remove_iam_role(email)
+                # Remove IAM Bindings
+                iam_ok, iam_msg = gcp_client.remove_iam_role(email, "roles/cloudaicompanion.user")
                 if not iam_ok:
-                    self.log(f"     ✗ [IAM Error]: {iam_msg}")
+                    self.log(f"     ✗ [GCA User IAM Error]: {iam_msg}")
+                    failed_actions += 1
+                    continue
+
+                iam_ok2, iam_msg2 = gcp_client.remove_iam_role(email, "roles/serviceusage.serviceUsageConsumer")
+                if not iam_ok2:
+                    self.log(f"     ✗ [Service Usage IAM Error]: {iam_msg2}")
                     failed_actions += 1
                     continue
 

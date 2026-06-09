@@ -159,10 +159,18 @@ def run(
             row_idx = item["row_index"]
             console.print(f"  • Processing [cyan]{email}[/]...")
             
-            # Step A: IAM binding
-            iam_ok, iam_msg = gcp_client.add_iam_role(email)
+            # Step A: IAM bindings
+            iam_ok, iam_msg = gcp_client.add_iam_role(email, "roles/cloudaicompanion.user")
             if not iam_ok:
-                console.print(f"    [red]✗ IAM Error:[/] {iam_msg}")
+                console.print(f"    [red]✗ GCA User IAM Error:[/] {iam_msg}")
+                failed_actions += 1
+                continue
+
+            iam_ok2, iam_msg2 = gcp_client.add_iam_role(email, "roles/serviceusage.serviceUsageConsumer")
+            if not iam_ok2:
+                console.print(f"    [red]✗ Service Usage IAM Error:[/] {iam_msg2}")
+                # Rollback GCA user role on failure
+                gcp_client.remove_iam_role(email, "roles/cloudaicompanion.user")
                 failed_actions += 1
                 continue
                 
@@ -170,8 +178,9 @@ def run(
             lic_ok, lic_msg = gcp_client.assign_license(email)
             if not lic_ok:
                 console.print(f"    [red]✗ License Error:[/] {lic_msg}")
-                # Optional rollback of IAM role on failure
-                gcp_client.remove_iam_role(email)
+                # Rollback both IAM roles on failure
+                gcp_client.remove_iam_role(email, "roles/serviceusage.serviceUsageConsumer")
+                gcp_client.remove_iam_role(email, "roles/cloudaicompanion.user")
                 failed_actions += 1
                 continue
 
@@ -188,10 +197,16 @@ def run(
             row_idx = item["row_index"]
             console.print(f"  • Processing [cyan]{email}[/]...")
             
-            # Step A: Remove IAM binding
-            iam_ok, iam_msg = gcp_client.remove_iam_role(email)
+            # Step A: Remove IAM bindings
+            iam_ok, iam_msg = gcp_client.remove_iam_role(email, "roles/cloudaicompanion.user")
             if not iam_ok:
-                console.print(f"    [red]✗ IAM Error:[/] {iam_msg}")
+                console.print(f"    [red]✗ GCA User IAM Error:[/] {iam_msg}")
+                failed_actions += 1
+                continue
+
+            iam_ok2, iam_msg2 = gcp_client.remove_iam_role(email, "roles/serviceusage.serviceUsageConsumer")
+            if not iam_ok2:
+                console.print(f"    [red]✗ Service Usage IAM Error:[/] {iam_msg2}")
                 failed_actions += 1
                 continue
 
