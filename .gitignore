@@ -1,0 +1,23 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# CSV tracker and backups (keeps template tracked, but ignores local data)
+gca_tracker.csv
+backups/
+
+# IDE / Editor configurations
+.idea/
+.vscode/
+*.swp
+*.swo
