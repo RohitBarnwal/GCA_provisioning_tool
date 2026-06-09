@@ -36,8 +36,12 @@ class GCPClient:
         url = f"https://cloudcommerceconsumerprocurement.googleapis.com/v1/billingAccounts/{self.billing_account_id}/orders/{self.order_id}/licensePool:assign"
         payload = {"usernames": [email]}
         
+        headers = {}
+        if self.project_id:
+            headers["X-Goog-User-Project"] = self.project_id
+        
         try:
-            response = self._session.post(url, json=payload)
+            response = self._session.post(url, json=payload, headers=headers)
             if response.status_code == 200:
                 return True, f"Successfully assigned procurement license to {email}"
             else:
@@ -55,8 +59,12 @@ class GCPClient:
         url = f"https://cloudcommerceconsumerprocurement.googleapis.com/v1/billingAccounts/{self.billing_account_id}/orders/{self.order_id}/licensePool:unassign"
         payload = {"usernames": [email]}
         
+        headers = {}
+        if self.project_id:
+            headers["X-Goog-User-Project"] = self.project_id
+        
         try:
-            response = self._session.post(url, json=payload)
+            response = self._session.post(url, json=payload, headers=headers)
             if response.status_code == 200:
                 return True, f"Successfully unassigned procurement license from {email}"
             else:

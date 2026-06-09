@@ -31,7 +31,8 @@ class TestGCPClient(unittest.TestCase):
         self.assertTrue("Successfully assigned" in msg)
         self.client._session.post.assert_called_once_with(
             "https://cloudcommerceconsumerprocurement.googleapis.com/v1/billingAccounts/test-billing/orders/test-order/licensePool:assign",
-            json={"usernames": ["user@example.com"]}
+            json={"usernames": ["user@example.com"]},
+            headers={"X-Goog-User-Project": "test-project"}
         )
 
     def test_assign_license_failure(self):
