@@ -15,6 +15,7 @@ Thumbs.db
 # CSV/Excel tracker and backups (keeps template tracked, but ignores local data)
 gca_tracker.xlsx
 backups/
+workspace_creations*.txt
 
 # IDE / Editor configurations
 .idea/

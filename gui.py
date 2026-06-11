@@ -8,6 +8,7 @@ import re
 from tracker_core.excel_manager import ExcelManager
 from tracker_core.evaluator import LicenseEvaluator
 from tracker_core.gcp_client import GCPClient
+from tracker_core.workspace_client import WorkspaceClient
 
 # Set theme and appearance options
 ctkinter_theme = "blue" # blue, green, dark-blue
@@ -21,8 +22,8 @@ class GCATrackerApp(ctkinter.CTk):
         super().__init__()
 
         self.title("Gemini Code Assist License Tracker")
-        self.geometry("900x700")
-        self.minsize(800, 600)
+        self.geometry("900x750")
+        self.minsize(800, 650)
 
         # Main grid configuration (2 columns, multiple rows)
         self.grid_columnconfigure(0, weight=1)
@@ -75,14 +76,23 @@ class GCATrackerApp(ctkinter.CTk):
 
         # Row 3: Billing & Order
         self.billing_label = ctkinter.CTkLabel(self.config_frame, text="Billing Account ID:")
-        self.billing_label.grid(row=2, column=0, padx=10, pady=(5, 10), sticky="w")
+        self.billing_label.grid(row=2, column=0, padx=10, pady=5, sticky="w")
         self.billing_entry = ctkinter.CTkEntry(self.config_frame, placeholder_text="012345-6789AB-CDEF01")
-        self.billing_entry.grid(row=2, column=1, padx=10, pady=(5, 10), sticky="ew")
+        self.billing_entry.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
 
         self.order_label = ctkinter.CTkLabel(self.config_frame, text="Procurement Order ID:")
-        self.order_label.grid(row=2, column=2, padx=10, pady=(5, 10), sticky="w")
+        self.order_label.grid(row=2, column=2, padx=10, pady=5, sticky="w")
         self.order_entry = ctkinter.CTkEntry(self.config_frame, placeholder_text="oph-987654321")
-        self.order_entry.grid(row=2, column=3, padx=10, pady=(5, 10), sticky="ew")
+        self.order_entry.grid(row=2, column=3, padx=10, pady=5, sticky="ew")
+
+        # Row 4: Google Workspace Checkbox
+        self.workspace_var = tk.BooleanVar(value=False)
+        self.workspace_checkbox = ctkinter.CTkCheckBox(
+            self.config_frame, 
+            text="Auto-Onboard Missing Users to Google Workspace Directory", 
+            variable=self.workspace_var
+        )
+        self.workspace_checkbox.grid(row=3, column=0, columnspan=4, padx=10, pady=(5, 10), sticky="w")
 
 
         # --- OUTPUT/LOG AREA ---
@@ -117,8 +127,8 @@ class GCATrackerApp(ctkinter.CTk):
 
         # Initial log message
         self.log("Welcome to GCA License Tracker GUI.\n"
-                 "Ensure you have authenticated with GCP using:\n"
-                 "  'gcloud auth application-default login'\n\n"
+                 "Ensure you have authenticated with GCP and Workspace using:\n"
+                 "  'gcloud auth application-default login --scopes=\"https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/admin.directory.user\"'\n\n"
                  "Select your tracker Excel file, enter your project details, and click 'Dry Run' to preview pending actions.")
 
     def browse_file(self):
@@ -143,6 +153,7 @@ class GCATrackerApp(ctkinter.CTk):
         project_id = self.project_entry.get().strip() or None
         billing_id = self.billing_entry.get().strip() or None
         order_id = self.order_entry.get().strip() or None
+        workspace = self.workspace_var.get()
         
         date_str = self.date_entry.get().strip()
         try:
@@ -164,7 +175,8 @@ class GCATrackerApp(ctkinter.CTk):
             "project_id": project_id,
             "billing_id": billing_id,
             "order_id": order_id,
-            "eval_date": eval_date
+            "eval_date": eval_date,
+            "workspace": workspace
         }
 
     def run_dry_run(self):
@@ -175,6 +187,7 @@ class GCATrackerApp(ctkinter.CTk):
         self.log("\n" + "="*80)
         self.log(f"--- STARTING DRY RUN EVALUATION ({config['eval_date']}) ---")
         self.log(f"File: {config['file_path']}")
+        self.log(f"Workspace Directory Check/Auto-Creation: {'Enabled' if config['workspace'] else 'Disabled'}")
         
         excel_manager = ExcelManager(config["file_path"])
         try:
@@ -254,6 +267,12 @@ class GCATrackerApp(ctkinter.CTk):
         
         self.log(f"   {msg}")
 
+        # Initialize Workspace client if requested
+        workspace_client = None
+        if config["workspace"]:
+            self.log("📂 Connecting to Google Workspace Admin Directory...")
+            workspace_client = WorkspaceClient(gcp_client._session)
+
         successful_provisions = 0
         successful_revocations = 0
         failed_actions = 0
@@ -265,6 +284,42 @@ class GCATrackerApp(ctkinter.CTk):
                 email = item["email"]
                 row_idx = item["row_index"]
                 self.log(f"   • Processing {email}...")
+
+                # Workspace onboarding step
+                if workspace_client:
+                    self.log(f"     Checking directory account status...")
+                    exists, ws_err = workspace_client.check_user_exists(email)
+                    if ws_err:
+                        self.log(f"     ✗ [Workspace Error]: {ws_err}")
+                        failed_actions += 1
+                        continue
+                    
+                    if not exists:
+                        self.log(f"     User not found. Auto-onboarding to Workspace...")
+                        first, last = WorkspaceClient.parse_name_from_email(email)
+                        temp_password = WorkspaceClient.generate_random_password()
+                        
+                        ws_ok, ws_msg = workspace_client.create_user(email, first, last, temp_password)
+                        if not ws_ok:
+                            self.log(f"     ✗ [Workspace Creation Error]: {ws_msg}")
+                            failed_actions += 1
+                            continue
+                        
+                        creds_file = f"workspace_creations_{date.today().strftime('%Y%m%d')}.txt"
+                        try:
+                            with open(creds_file, "a", encoding="utf-8") as f:
+                                f.write(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                                f.write(f"Email:     {email}\n")
+                                f.write(f"Name:      {first} {last}\n")
+                                f.write(f"Temporary Password: {temp_password}\n")
+                                f.write("-" * 50 + "\n")
+                            self.log(f"     ✓ Successfully created directory account for {email}")
+                            self.log(f"       Temporary credentials logged to local file: {creds_file}")
+                        except Exception as e:
+                            self.log(f"     ⚠ [Warning]: User created but failed to log to local file: {e}")
+                            self.log(f"       Credentials to distribute: Email={email}, Pass={temp_password}")
+                    else:
+                        self.log(f"     ✓ Directory account already exists.")
 
                 # IAM Bindings
                 iam_ok, iam_msg = gcp_client.add_iam_role(email, "roles/cloudaicompanion.user")

@@ -10,6 +10,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from tracker_core.excel_manager import ExcelManager
 from tracker_core.evaluator import LicenseEvaluator
 from tracker_core.gcp_client import GCPClient
+from tracker_core.workspace_client import WorkspaceClient
 
 app = typer.Typer(help="GCA License Tracker CLI")
 console = Console()
@@ -22,6 +23,7 @@ def run(
     order_id: Optional[str] = typer.Option(None, "--order", "-o", help="GCP Order ID for Procurement API"),
     execute: bool = typer.Option(False, "--execute", "-x", help="Actually execute GCP changes and update Excel (default is dry-run)"),
     eval_date_str: Optional[str] = typer.Option(None, "--date", "-d", help="Override evaluation date (YYYY-MM-DD), default is today"),
+    workspace: bool = typer.Option(False, "--workspace", "-w", help="Enable Google Workspace directory check and auto-creation of missing users"),
 ):
     """
     Evaluates and processes GCA user licenses and IAM role bindings.
@@ -65,7 +67,7 @@ def run(
         f"File: [yellow]{file}[/]\n"
         f"Evaluation Date: [green]{eval_date}[/]\n"
         f"Mode: [bold]{'EXECUTE' if execute else 'DRY-RUN (Safe Mode)'}[/]\n"
-        f"Configuration: Project={project_id or 'None'}, BillingAccount={billing_account_id or 'None'}, Order={order_id or 'None'}",
+        f"Configuration: Project={project_id or 'None'}, BillingAccount={billing_account_id or 'None'}, Order={order_id or 'None'}, WorkspaceOnboarding={'Enabled' if workspace else 'Disabled'}",
         title="Session Info"
     ))
 
@@ -123,7 +125,7 @@ def run(
 
     # 5. Execute Mode
     if not execute:
-        console.print("[bold yellow]This was a DRY-RUN. No changes were made to GCP or your Excel file.[/]")
+        console.print("[bold yellow]This was a DRY-RUN. No changes were made to GCP, Workspace, or your Excel file.[/]")
         console.print("To execute these actions, run with the [green]--execute[/] (or [green]-x[/]) flag.")
         return
 
@@ -151,6 +153,11 @@ def run(
     successful_revocations = 0
     failed_actions = 0
 
+    # Initialize Workspace Client if enabled
+    workspace_client = None
+    if workspace:
+        workspace_client = WorkspaceClient(gcp_client._session)
+
     # Process Provisions
     if to_provision:
         console.print("[bold green]Executing Provisioning Actions...[/]")
@@ -159,6 +166,43 @@ def run(
             row_idx = item["row_index"]
             console.print(f"  • Processing [cyan]{email}[/]...")
             
+            # Step 0: Google Workspace directory onboarding
+            if workspace_client:
+                console.print(f"    Checking Workspace directory for {email}...")
+                exists, ws_err = workspace_client.check_user_exists(email)
+                if ws_err:
+                    console.print(f"    [red]✗ Workspace Query Error:[/] {ws_err}")
+                    failed_actions += 1
+                    continue
+                
+                if not exists:
+                    console.print(f"    User {email} not found in directory. Attempting creation...")
+                    first, last = WorkspaceClient.parse_name_from_email(email)
+                    temp_password = WorkspaceClient.generate_random_password()
+                    
+                    ws_ok, ws_msg = workspace_client.create_user(email, first, last, temp_password)
+                    if not ws_ok:
+                        console.print(f"    [red]✗ Workspace Creation Error:[/] {ws_msg}")
+                        failed_actions += 1
+                        continue
+                    
+                    # Log credentials to local, private text file (ignored by Git)
+                    creds_file = f"workspace_creations_{date.today().strftime('%Y%m%d')}.txt"
+                    try:
+                        with open(creds_file, "a", encoding="utf-8") as f:
+                            f.write(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                            f.write(f"Email:     {email}\n")
+                            f.write(f"Name:      {first} {last}\n")
+                            f.write(f"Temporary Password: {temp_password}\n")
+                            f.write("-" * 50 + "\n")
+                        console.print(f"    [green]✓ Created Directory Account for {email}![/]")
+                        console.print(f"      Temporary credentials logged to [yellow]{creds_file}[/]")
+                    except Exception as e:
+                        console.print(f"    [yellow]⚠ Warning:[/] Created user, but failed to write local backup file: {e}")
+                        console.print(f"      Credentials to distribute: Email={email}, Pass={temp_password}")
+                else:
+                    console.print(f"    [green]✓ User already exists in directory.[/]")
+
             # Step A: IAM bindings
             iam_ok, iam_msg = gcp_client.add_iam_role(email, "roles/cloudaicompanion.user")
             if not iam_ok:
