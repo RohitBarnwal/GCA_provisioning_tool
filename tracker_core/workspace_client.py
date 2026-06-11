@@ -1,7 +1,6 @@
 import logging
 import random
 import string
-import re
 from typing import Tuple, Optional
 
 logger = logging.getLogger("gca_tracker")
@@ -9,25 +8,6 @@ logger = logging.getLogger("gca_tracker")
 class WorkspaceClient:
     def __init__(self, session):
         self._session = session
-
-    @staticmethod
-    def parse_name_from_email(email: str) -> Tuple[str, str]:
-        """
-        Parses First Name and Last Name from an email address (e.g. john.doe@domain.com).
-        """
-        local_part = email.split("@")[0]
-        # Replace non-alphabetic characters with spaces
-        clean_part = re.sub(r"[^a-zA-Z]", " ", local_part)
-        parts = clean_part.split()
-        
-        if len(parts) >= 2:
-            first = parts[0].capitalize()
-            last = " ".join(p.capitalize() for p in parts[1:])
-            return first, last
-        elif len(parts) == 1:
-            return parts[0].capitalize(), "Employee"
-        else:
-            return "User", "GCA-Staff"
 
     @staticmethod
     def generate_random_password(length: int = 12) -> str:

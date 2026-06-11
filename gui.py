@@ -296,7 +296,16 @@ class GCATrackerApp(ctkinter.CTk):
                     
                     if not exists:
                         self.log(f"     User not found. Auto-onboarding to Workspace...")
-                        first, last = WorkspaceClient.parse_name_from_email(email)
+                        
+                        # Retrieve names directly from Excel record
+                        first = item["record"].get("First Name", "").strip()
+                        last = item["record"].get("Last Name", "").strip()
+                        
+                        if not first or not last:
+                            self.log(f"     ✗ [Onboarding Error]: Cannot create account for {email} because 'First Name' or 'Last Name' is missing in the Excel sheet.")
+                            failed_actions += 1
+                            continue
+                            
                         temp_password = WorkspaceClient.generate_random_password()
                         
                         ws_ok, ws_msg = workspace_client.create_user(email, first, last, temp_password)

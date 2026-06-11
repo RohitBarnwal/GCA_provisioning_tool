@@ -4,7 +4,7 @@ import openpyxl
 from datetime import datetime, date
 from typing import List, Dict
 
-REQUIRED_COLUMNS = ["Email", "Team Name", "Start Date", "End Date", "Status", "Reason"]
+REQUIRED_COLUMNS = ["Email", "First Name", "Last Name", "Team Name", "Start Date", "End Date", "Status", "Reason"]
 
 class ExcelManager:
     def __init__(self, file_path: str):

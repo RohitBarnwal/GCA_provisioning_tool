@@ -7,21 +7,6 @@ class TestWorkspaceClient(unittest.TestCase):
         self.session = MagicMock()
         self.client = WorkspaceClient(self.session)
 
-    def test_parse_name_from_email_dot_separated(self):
-        first, last = WorkspaceClient.parse_name_from_email("john.doe@example.com")
-        self.assertEqual(first, "John")
-        self.assertEqual(last, "Doe")
-
-    def test_parse_name_from_email_multiple_parts(self):
-        first, last = WorkspaceClient.parse_name_from_email("rohit.kumar.barnwal@example.com")
-        self.assertEqual(first, "Rohit")
-        self.assertEqual(last, "Kumar Barnwal")
-
-    def test_parse_name_from_email_single_word(self):
-        first, last = WorkspaceClient.parse_name_from_email("admin@example.com")
-        self.assertEqual(first, "Admin")
-        self.assertEqual(last, "Employee")
-
     def test_generate_random_password(self):
         pwd = WorkspaceClient.generate_random_password(16)
         self.assertEqual(len(pwd), 16)

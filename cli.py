@@ -14,6 +14,7 @@ from tracker_core.workspace_client import WorkspaceClient
 
 app = typer.Typer(help="GCA License Tracker CLI")
 console = Console()
+err_console = Console(stderr=True)
 
 @app.command()
 def run(
@@ -36,7 +37,7 @@ def run(
         try:
             eval_date = datetime.strptime(eval_date_str.strip(), "%Y-%m-%d").date()
         except ValueError:
-            console.print(f"[bold red]Error:[/] Invalid date format '{eval_date_str}'. Must be YYYY-MM-DD.", err=True)
+            err_console.print(f"[bold red]Error:[/] Invalid date format '{eval_date_str}'. Must be YYYY-MM-DD.")
             raise typer.Exit(code=1)
 
     # 2. Check and load Excel
@@ -47,14 +48,14 @@ def run(
             import shutil
             shutil.copy("gca_tracker_template.xlsx", "gca_tracker.xlsx")
         else:
-            console.print(f"[bold red]Error:[/] File not found: '{file}'", err=True)
+            err_console.print(f"[bold red]Error:[/] File not found: '{file}'")
             raise typer.Exit(code=1)
 
     excel_manager = ExcelManager(file)
     try:
         records = excel_manager.read_records()
     except Exception as e:
-        console.print(f"[bold red]Error loading Excel:[/] {e}", err=True)
+        err_console.print(f"[bold red]Error loading Excel:[/] {e}")
         raise typer.Exit(code=1)
 
     # 3. Evaluate records
@@ -91,15 +92,18 @@ def run(
     actions_table = Table(title="Pending License Actions", header_style="bold cyan")
     actions_table.add_column("Action", style="bold")
     actions_table.add_column("Email", style="green")
+    actions_table.add_column("Name", style="magenta")
     actions_table.add_column("Team")
     actions_table.add_column("Date Trigger", style="yellow")
     actions_table.add_column("Reason")
 
     for item in to_provision:
         rec = item["record"]
+        name = f"{rec.get('First Name', '')} {rec.get('Last Name', '')}".strip() or "N/A"
         actions_table.add_row(
             "PROVISION",
             item["email"],
+            name,
             rec.get("Team Name", "N/A"),
             f"Start: {item['start_date']}",
             rec.get("Reason", "")
@@ -107,9 +111,11 @@ def run(
 
     for item in to_revoke:
         rec = item["record"]
+        name = f"{rec.get('First Name', '')} {rec.get('Last Name', '')}".strip() or "N/A"
         actions_table.add_row(
             "REVOKE",
             item["email"],
+            name,
             rec.get("Team Name", "N/A"),
             f"End: {item['end_date']}",
             rec.get("Reason", "")
@@ -131,7 +137,7 @@ def run(
 
     # Check that at least one config element is present
     if not project_id and not (billing_account_id and order_id):
-        console.print("[bold red]Error:[/] You must provide either --project (for IAM) or --billing-account and --order (for Procurement) in execute mode.", err=True)
+        err_console.print("[bold red]Error:[/] You must provide either --project (for IAM) or --billing-account and --order (for Procurement) in execute mode.")
         raise typer.Exit(code=1)
 
     # Initialize GCP Client
@@ -145,7 +151,7 @@ def run(
         success, msg = gcp_client.initialize()
         if not success:
             progress.stop()
-            console.print(f"[bold red]Authentication Error:[/] {msg}", err=True)
+            err_console.print(f"[bold red]Authentication Error:[/] {msg}")
             raise typer.Exit(code=1)
 
     # Track successes
@@ -164,6 +170,7 @@ def run(
         for item in to_provision:
             email = item["email"]
             row_idx = item["row_index"]
+            rec = item["record"]
             console.print(f"  • Processing [cyan]{email}[/]...")
             
             # Step 0: Google Workspace directory onboarding
@@ -177,7 +184,16 @@ def run(
                 
                 if not exists:
                     console.print(f"    User {email} not found in directory. Attempting creation...")
-                    first, last = WorkspaceClient.parse_name_from_email(email)
+                    
+                    # Retrieve names directly from Excel record
+                    first = rec.get("First Name", "").strip()
+                    last = rec.get("Last Name", "").strip()
+                    
+                    if not first or not last:
+                        console.print(f"    [red]✗ Onboarding Error:[/] Cannot create account for {email} because 'First Name' or 'Last Name' is missing in the Excel sheet.")
+                        failed_actions += 1
+                        continue
+                        
                     temp_password = WorkspaceClient.generate_random_password()
                     
                     ws_ok, ws_msg = workspace_client.create_user(email, first, last, temp_password)
@@ -274,7 +290,7 @@ def run(
             console.print(f"[bold green]✓ Excel file successfully updated![/]")
             console.print(f"  Backup created at: [yellow]{backup_path}[/]")
         except Exception as e:
-            console.print(f"[bold red]Failed to write updates to Excel:[/] {e}", err=True)
+            err_console.print(f"[bold red]Failed to write updates to Excel:[/] {e}")
             raise typer.Exit(code=1)
 
     # Final summary panel
