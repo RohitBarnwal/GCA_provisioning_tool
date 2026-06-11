@@ -271,7 +271,7 @@ class GCATrackerApp(ctkinter.CTk):
         workspace_client = None
         if config["workspace"]:
             self.log("📂 Connecting to Google Workspace Admin Directory...")
-            workspace_client = WorkspaceClient(gcp_client._session)
+            workspace_client = WorkspaceClient(gcp_client._session, project_id=config["project_id"])
 
         successful_provisions = 0
         successful_revocations = 0

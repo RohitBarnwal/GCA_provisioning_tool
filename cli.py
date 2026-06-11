@@ -162,7 +162,7 @@ def run(
     # Initialize Workspace Client if enabled
     workspace_client = None
     if workspace:
-        workspace_client = WorkspaceClient(gcp_client._session)
+        workspace_client = WorkspaceClient(gcp_client._session, project_id=project_id)
 
     # Process Provisions
     if to_provision:

@@ -24,7 +24,7 @@ class TestWorkspaceClient(unittest.TestCase):
         exists, err = self.client.check_user_exists("user@example.com")
         self.assertTrue(exists)
         self.assertIsNone(err)
-        self.session.get.assert_called_once_with("https://admin.googleapis.com/admin/directory/v1/users/user@example.com")
+        self.session.get.assert_called_once_with("https://admin.googleapis.com/admin/directory/v1/users/user@example.com", headers={})
 
     def test_check_user_exists_false(self):
         mock_response = MagicMock()
@@ -51,7 +51,24 @@ class TestWorkspaceClient(unittest.TestCase):
                 "name": {"givenName": "John", "familyName": "Doe"},
                 "password": "TempPass123!",
                 "changePasswordAtNextLogin": True
-            }
+            },
+            headers={}
+        )
+
+    def test_check_user_exists_with_quota_project(self):
+        client = WorkspaceClient(self.session, project_id="test-project")
+        client._initialized = True
+        client._workspace_session = self.session
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        self.session.get.return_value = mock_response
+
+        exists, err = client.check_user_exists("user@example.com")
+        self.assertTrue(exists)
+        self.session.get.assert_called_with(
+            "https://admin.googleapis.com/admin/directory/v1/users/user@example.com",
+            headers={"X-Goog-User-Project": "test-project"}
         )
 
 if __name__ == "__main__":
